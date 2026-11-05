@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@page{size:1280px 720px;margin:0}
+*{box-sizing:border-box}body{margin:0;font-family:"DejaVu Sans",Helvetica,sans-serif;color:#1d2733}
+section{width:1280px;height:720px;padding:56px 72px;page-break-after:always;position:relative;overflow:hidden}
+h1{font-size:46px;margin:0 0 24px;color:#1f4e79}h2{font-size:36px;margin:0 0 26px;color:#1f4e79}
+p,li{font-size:26px;line-height:1.45}code,pre{font-family:"DejaVu Sans Mono",monospace}
+pre{background:#f1f4f8;padding:20px 26px;border-radius:8px;font-size:22px;line-height:1.4}
+table{border-collapse:collapse;font-size:24px;width:100%}th,td{padding:10px 16px;text-align:left;border-bottom:1px solid #d5dbe3}
+th{color:#1f4e79}.n{text-align:right;font-family:"DejaVu Sans Mono",monospace}
+.big{font-size:60px;text-align:center;margin:40px 0;color:#1f4e79}.small{font-size:18px;color:#667}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.grid img{width:100%;height:268px;object-fit:contain}
+.title{background:#1f4e79;color:#fff}.title h1{color:#fff;font-size:58px;margin-top:150px}.title p{color:#cfe0f0}
+</style></head><body>
+<section class="title"><h1>Integrating a Gaussian<br>in Fortran, C, Python and Julia</h1><p>Same algorithm, four languages: how fast, how complex?</p></section>
+
+<section><h2>1. The problem and the analytic answer</h2>
+<div class="big">∫₀¹ (1/√2π) e<sup>−x²/2</sup> dx = ½ erf(1/√2) = 0.341344746068543</div>
+<p>= Φ(1) − ½, the familiar “34.13 %” of the 68–95–99.7 rule.</p>
+<p>Numerically: composite <b>Simpson's rule</b>, N = 10⁸ intervals, identical loop in every language.</p></section>
+
+<section><h2>2. The same loop, four ways</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<pre style="font-size:17px">// C
+for (long i=1; i&lt;n; i++)
+    s += f(a+i*h) * ((i&amp;1) ? 4.0 : 2.0);</pre>
+<pre style="font-size:17px">! Fortran
+do k = 1, n-1
+   s = s + merge(4d0,2d0,mod(k,2_8)==1)*f(a+k*h)
+end do</pre>
+<pre style="font-size:17px"># Python
+for i in range(1, n):
+    s += f(a+i*h) * (4.0 if i &amp; 1 else 2.0)</pre>
+<pre style="font-size:17px"># Julia
+for i in 1:n-1
+    s += f(a+i*h) * (isodd(i) ? 4.0 : 2.0)
+end</pre></div>
+<p>Python/Julia: ~8 lines, read like the maths. C/Fortran: ~12–15 lines, explicit types and a compile step.</p></section>
+
+<section><h2>3. Speed (N = 10⁸, best of 3)</h2><div style="display:flex;gap:30px;align-items:center">
+<img src="timings.png" style="width:760px"><div><p><b>C ≈ Fortran ≈ Julia</b> (~1 s): within noise, dominated by <code>exp()</code>.</p>
+<p>NumPy: ~2.5× slower (10⁸-element temporaries).</p><p>Pure Python: <b>~35× slower</b>.</p></div></div>
+<p class="small">Shared 4-core cloud VM, timings noisy. Julia excludes JIT warm-up. Loop results 0.341344746068522: error 2·10⁻¹⁴ is naive-summation round-off; NumPy's pairwise sum is exact to all digits.</p></section>
+
+<section><h2>4. Plot the area: four languages</h2><div class="grid">
+<img src="plot_c.png"><img src="plot_fortran.png"><img src="plot_python.png"><img src="plot_julia.png"></div></section>
+
+<section><h2>5. Plotting: code and time</h2>
+<table><tr><th>Language</th><th>Tool</th><th class="n">Wall time</th></tr>
+<tr><td>C</td><td>gnuplot via popen</td><td class="n">0.06 s</td></tr>
+<tr><td>Fortran</td><td>gnuplot via data file</td><td class="n">0.06 s</td></tr>
+<tr><td>Python</td><td>matplotlib</td><td class="n">~1 s</td></tr>
+<tr><td>Julia</td><td>Plots.jl (GR)</td><td class="n">3–4 s (startup + package load)</td></tr></table>
+<pre style="margin-top:28px">ax.plot(x, g(x));  ax.fill_between(xs, g(xs), alpha=.6)        # Python
+plot(x, g.(x));    plot!(xs, g.(xs), fillrange=0, fillalpha=.6)  # Julia</pre>
+<p>C and Fortran have no native plotting: they hand the data to gnuplot.</p></section>
+
+<section><h2>Take-aways</h2><ul>
+<li>Compiled Fortran, C and Julia are equally fast; Julia matches them with Python-like code.</li>
+<li>NumPy recovers most of Python's speed; pure Python loops cost ~35×.</li>
+<li>Plotting: a different story. Startup cost matters more than compute for small jobs.</li>
+<li>Code, data and Makefile: <b>github.com/&lt;you&gt;/gauss-integral-benchmark</b></li></ul></section>
+</body></html>
